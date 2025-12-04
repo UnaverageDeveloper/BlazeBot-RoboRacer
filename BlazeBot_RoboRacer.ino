@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <math.h>
 #include "BluetoothSerial.h"
 
 BluetoothSerial SerialBT;
@@ -14,13 +15,8 @@ const int rightRPWM = 33;
 const int rightLPWM = 32;
 
 const int pwmFreq = 20000;
-const int pwmRes = 8;
+const int pwmResBits = 8;
 const int maxDuty = 255;
-
-const int chLeftRPWMChannel = 0;
-const int chLeftLPWMChannel = 1;
-const int chRightRPWMChannel = 2;
-const int chRightLPWMChannel = 3;
 
 enum SpeedMode { CRAWLER, NORMAL, TURBO };
 
@@ -57,38 +53,38 @@ bool decodeTraction(unsigned long ch5us) {
   return ch5us > 1500;
 }
 
-void setMotor(int pwmChannelFwd, int pwmChannelRev, float value) {
+void setupPwmPin(int pin) {
+  analogWriteResolution(pin, pwmResBits);
+  analogWriteFrequency(pin, pwmFreq);
+  analogWrite(pin, 0);
+}
+
+void setMotor(int pinFwd, int pinRev, float value) {
   if (value > 1.0f) value = 1.0f;
   if (value < -1.0f) value = -1.0f;
 
-  int dutyFwd = 0;
-  int dutyRev = 0;
+  int duty = 0;
 
   if (value > 0.02f) {
-    dutyFwd = (int)(value * maxDuty);
-    dutyRev = 0;
+    duty = (int)(value * maxDuty);
+    if (duty > maxDuty) duty = maxDuty;
+    if (duty < 0) duty = 0;
+    analogWrite(pinFwd, duty);
+    analogWrite(pinRev, 0);
+    digitalWrite(pinRev, LOW);
   } else if (value < -0.02f) {
-    dutyFwd = 0;
-    dutyRev = (int)(-value * maxDuty);
+    duty = (int)(-value * maxDuty);
+    if (duty > maxDuty) duty = maxDuty;
+    if (duty < 0) duty = 0;
+    analogWrite(pinRev, duty);
+    analogWrite(pinFwd, 0);
+    digitalWrite(pinFwd, LOW);
   } else {
-    dutyFwd = 0;
-    dutyRev = 0;
+    analogWrite(pinFwd, 0);
+    analogWrite(pinRev, 0);
+    digitalWrite(pinFwd, LOW);
+    digitalWrite(pinRev, LOW);
   }
-
-  ledcWrite(pwmChannelFwd, dutyFwd);
-  ledcWrite(pwmChannelRev, dutyRev);
-}
-
-void setupPWM() {
-  ledcSetup(chLeftRPWMChannel, pwmFreq, pwmRes);
-  ledcSetup(chLeftLPWMChannel, pwmFreq, pwmRes);
-  ledcSetup(chRightRPWMChannel, pwmFreq, pwmRes);
-  ledcSetup(chRightLPWMChannel, pwmFreq, pwmRes);
-
-  ledcAttachPin(leftRPWM, chLeftRPWMChannel);
-  ledcAttachPin(leftLPWM, chLeftLPWMChannel);
-  ledcAttachPin(rightRPWM, chRightRPWMChannel);
-  ledcAttachPin(rightLPWM, chRightLPWMChannel);
 }
 
 void setup() {
@@ -97,10 +93,18 @@ void setup() {
   pinMode(ch5Pin, INPUT);
   pinMode(ch6Pin, INPUT);
 
+  pinMode(leftRPWM, OUTPUT);
+  pinMode(leftLPWM, OUTPUT);
+  pinMode(rightRPWM, OUTPUT);
+  pinMode(rightLPWM, OUTPUT);
+
+  setupPwmPin(leftRPWM);
+  setupPwmPin(leftLPWM);
+  setupPwmPin(rightRPWM);
+  setupPwmPin(rightLPWM);
+
   Serial.begin(115200);
   SerialBT.begin("BlazeBot");
-
-  setupPWM();
 }
 
 void loop() {
@@ -149,14 +153,14 @@ void loop() {
   float left = throttle + steering;
   float right = throttle - steering;
 
-  float maxMag = max(fabs(left), fabs(right));
+  float maxMag = fmax(fabs(left), fabs(right));
   if (maxMag > 1.0f) {
     left /= maxMag;
     right /= maxMag;
   }
 
-  setMotor(chLeftRPWMChannel, chLeftLPWMChannel, left);
-  setMotor(chRightRPWMChannel, chRightLPWMChannel, right);
+  setMotor(leftRPWM, leftLPWM, left);
+  setMotor(rightRPWM, rightLPWM, right);
 
   unsigned long now = millis();
   if (now - lastDebugTime > debugInterval) {
