@@ -1,0 +1,81 @@
+#include <Arduino.h>
+
+const int leftRPWM = 26;
+const int leftLPWM = 25;
+const int rightRPWM = 33;
+const int rightLPWM = 32;
+
+const int pwmFreq = 20000;
+const int pwmResBits = 8;
+const int maxDuty = 255;
+
+void setupPwmPin(int pin) {
+  analogWriteResolution(pin, pwmResBits);
+  analogWriteFrequency(pin, pwmFreq);
+  analogWrite(pin, 0);
+}
+
+void allStop() {
+  analogWrite(leftRPWM, 0);
+  analogWrite(leftLPWM, 0);
+  analogWrite(rightRPWM, 0);
+  analogWrite(rightLPWM, 0);
+}
+
+void rampMotor(int pinFwd, int pinRev, const char* name) {
+  Serial.print("Forward: ");
+  Serial.println(name);
+  for (int d = 0; d <= maxDuty; d += 5) {
+    analogWrite(pinFwd, d);
+    analogWrite(pinRev, 0);
+    delay(20);
+  }
+  for (int d = maxDuty; d >= 0; d -= 5) {
+    analogWrite(pinFwd, d);
+    analogWrite(pinRev, 0);
+    delay(20);
+  }
+  delay(500);
+
+  Serial.print("Reverse: ");
+  Serial.println(name);
+  for (int d = 0; d <= maxDuty; d += 5) {
+    analogWrite(pinRev, d);
+    analogWrite(pinFwd, 0);
+    delay(20);
+  }
+  for (int d = maxDuty; d >= 0; d -= 5) {
+    analogWrite(pinRev, d);
+    analogWrite(pinFwd, 0);
+    delay(20);
+  }
+  delay(500);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(leftRPWM, OUTPUT);
+  pinMode(leftLPWM, OUTPUT);
+  pinMode(rightRPWM, OUTPUT);
+  pinMode(rightLPWM, OUTPUT);
+
+  setupPwmPin(leftRPWM);
+  setupPwmPin(leftLPWM);
+  setupPwmPin(rightRPWM);
+  setupPwmPin(rightLPWM);
+
+  allStop();
+}
+
+void loop() {
+  Serial.println("Testing LEFT motor");
+  rampMotor(leftRPWM, leftLPWM, "LEFT");
+  allStop();
+  delay(1000);
+
+  Serial.println("Testing RIGHT motor");
+  rampMotor(rightRPWM, rightLPWM, "RIGHT");
+  allStop();
+  delay(2000);
+}
