@@ -1,0 +1,71 @@
+#include <Arduino.h>
+#include <math.h>
+
+const int ch1Pin = 35;
+const int ch2Pin = 34;
+const int ch5Pin = 27;
+const int ch6Pin = 14;
+
+unsigned long lastPrint = 0;
+unsigned long printInterval = 100;
+
+unsigned long readPulseSafe(int pin) {
+  return pulseIn(pin, HIGH, 25000);
+}
+
+float normRC(unsigned long us, float lastVal) {
+  if (us < 900 || us > 2100) return lastVal;
+  float v = ((float)us - 1500.0f) / 500.0f;
+  if (v > 1.0f) v = 1.0f;
+  if (v < -1.0f) v = -1.0f;
+  return v;
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(ch1Pin, INPUT);
+  pinMode(ch2Pin, INPUT);
+  pinMode(ch5Pin, INPUT);
+  pinMode(ch6Pin, INPUT);
+}
+
+void loop() {
+  unsigned long ch1us = readPulseSafe(ch1Pin);
+  unsigned long ch2us = readPulseSafe(ch2Pin);
+  unsigned long ch5us = readPulseSafe(ch5Pin);
+  unsigned long ch6us = readPulseSafe(ch6Pin);
+
+  static float ch1Norm = 0.0f;
+  static float ch2Norm = 0.0f;
+  static float ch5Norm = 0.0f;
+  static float ch6Norm = 0.0f;
+
+  ch1Norm = normRC(ch1us, ch1Norm);
+  ch2Norm = normRC(ch2us, ch2Norm);
+  ch5Norm = normRC(ch5us, ch5Norm);
+  ch6Norm = normRC(ch6us, ch6Norm);
+
+  if (millis() - lastPrint > printInterval) {
+    lastPrint = millis();
+    Serial.print("CH1 us=");
+    Serial.print(ch1us);
+    Serial.print(" norm=");
+    Serial.print(ch1Norm, 2);
+
+    Serial.print(" | CH2 us=");
+    Serial.print(ch2us);
+    Serial.print(" norm=");
+    Serial.print(ch2Norm, 2);
+
+    Serial.print(" | CH5 us=");
+    Serial.print(ch5us);
+    Serial.print(" norm=");
+    Serial.print(ch5Norm, 2);
+
+    Serial.print(" | CH6 us=");
+    Serial.print(ch6us);
+    Serial.print(" norm=");
+    Serial.println(ch6Norm, 2);
+  }
+}
